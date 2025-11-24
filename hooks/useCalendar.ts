@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { isSameDay } from 'date-fns';
 import { getCalendarDays } from '@/lib/calendar/utils';
-import type { CalendarConfig, CalendarDate, CalendarView } from '@/lib/calendar/types';
+import type { CalendarConfig, CalendarView } from '@/lib/calendar/types';
 import { DEFAULT_CALENDAR_CONFIG } from '@/constants/calendar';
 
 export const useCalendar = (
@@ -15,12 +14,18 @@ export const useCalendar = (
     year: initialDate.getFullYear(),
   });
 
-  const fullConfig: CalendarConfig = {
-    ...DEFAULT_CALENDAR_CONFIG,
-    ...config,
-  };
+  const fullConfig: CalendarConfig = useMemo(
+    () => ({
+      ...DEFAULT_CALENDAR_CONFIG,
+      ...config,
+    }),
+    [config]
+  );
 
-  const viewDate = new Date(currentView.year, currentView.month, 1);
+  const viewDate = useMemo(
+    () => new Date(currentView.year, currentView.month, 1),
+    [currentView.year, currentView.month]
+  );
 
   const calendarDays = useMemo(
     () => getCalendarDays(viewDate, fullConfig),
@@ -60,5 +65,11 @@ export const useCalendar = (
     viewDate,
   };
 };
+
+
+
+
+
+
 
 

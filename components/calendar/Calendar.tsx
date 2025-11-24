@@ -12,7 +12,7 @@ export const Calendar = ({
   onSelectDate,
   config,
   disabledDates = [],
-  highlightedDates = [],
+  highlightedDates = [],  // New prop for highlighted dates
 }: CalendarProps) => {
   const [internalSelected, setInternalSelected] = useState<Date | undefined>(selectedDate);
   
