@@ -36,8 +36,14 @@ export default function Home() {
     setSelectedSlot(null); // Reset slot selection when date changes
   };
 
-  const handleWizardComplete = () => {
-    setShowWizard(false);
+  const handleWizardComplete = async (newAvailability: any, newConfig: any) => {
+    try {
+      await saveAvailability(newAvailability, newConfig);
+      setShowWizard(false);
+    } catch (error) {
+      console.error('Failed to save availability:', error);
+      alert('Failed to save availability. Please try again.');
+    }
   };
 
   const handleEditAvailability = () => {
@@ -65,10 +71,7 @@ export default function Home() {
           </div>
 
           <AvailabilityWizard
-            onComplete={(newAvailability, newConfig) => {
-              saveAvailability(newAvailability, newConfig);
-              handleWizardComplete();
-            }}
+            onComplete={handleWizardComplete}
             initialAvailability={availability ?? undefined}
             initialConfig={config ?? undefined}
           />

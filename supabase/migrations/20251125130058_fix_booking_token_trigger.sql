@@ -15,3 +15,4 @@ CREATE TRIGGER generate_booking_token_on_insert
 COMMENT ON TRIGGER generate_booking_token_on_insert ON public.appointments 
   IS 'Automatically generates booking token for all new appointments';
 
+

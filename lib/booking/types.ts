@@ -164,3 +164,4 @@ export function appointmentStatusToString(status: AppointmentStatus): string {
   return status as string;
 }
 
+

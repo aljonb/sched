@@ -13,3 +13,4 @@ CREATE POLICY "Public can view confirmed and pending appointments"
 COMMENT ON POLICY "Public can view confirmed and pending appointments" ON public.appointments 
   IS 'Allows anonymous users to see booked slots for availability checking';
 
+
