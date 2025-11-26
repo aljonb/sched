@@ -14,3 +14,7 @@ COMMENT ON POLICY "Public can view confirmed and pending appointments" ON public
   IS 'Allows anonymous users to see booked slots for availability checking';
 
 
+
+
+
+

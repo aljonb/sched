@@ -9,7 +9,7 @@
 
 import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
-import type { Business, Appointment } from './types';
+import type { Business, Appointment, CreateAppointmentInput } from './types';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -308,6 +308,89 @@ export async function getAppointmentByToken(
 }
 
 // ============================================
+// APPOINTMENT MUTATIONS
+// ============================================
+
+/**
+ * Creates a new appointment
+ * 
+ * @param input - Appointment creation data
+ * @returns Created Appointment object with booking token
+ * 
+ * @security Respects RLS: Public can create appointments for any active business
+ * 
+ * @example
+ * ```ts
+ * const result = await createAppointment({
+ *   business_id: 'business-uuid',
+ *   start_time: new Date('2025-11-26T14:00:00Z'),
+ *   end_time: new Date('2025-11-26T15:00:00Z'),
+ *   duration_minutes: 60,
+ *   customer_email: 'customer@example.com',
+ *   customer_name: 'John Doe',
+ *   customer_phone: '+1234567890',
+ *   notes: 'First appointment',
+ * });
+ * if (result.success) {
+ *   console.log(`Booked! Token: ${result.data.booking_token}`);
+ * }
+ * ```
+ */
+export async function createAppointment(
+  input: CreateAppointmentInput
+): Promise<DbResult<Appointment>> {
+  try {
+    const supabase = await createClient(cookies());
+    
+    // Convert dates to ISO strings if needed
+    const startTimeStr = input.start_time instanceof Date 
+      ? input.start_time.toISOString() 
+      : input.start_time;
+    const endTimeStr = input.end_time instanceof Date 
+      ? input.end_time.toISOString() 
+      : input.end_time;
+
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert({
+        business_id: input.business_id,
+        customer_id: input.customer_id ?? null,
+        start_time: startTimeStr,
+        end_time: endTimeStr,
+        duration_minutes: input.duration_minutes,
+        customer_email: input.customer_email,
+        customer_name: input.customer_name,
+        customer_phone: input.customer_phone ?? null,
+        notes: input.notes ?? null,
+        status: input.status ?? 'pending',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return { 
+        success: false, 
+        error: `Failed to create appointment: ${error.message}` 
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'Failed to create appointment: No data returned'
+      };
+    }
+
+    return { success: true, data };
+  } catch (err) {
+    return { 
+      success: false, 
+      error: `Unexpected error creating appointment: ${err instanceof Error ? err.message : 'Unknown error'}` 
+    };
+  }
+}
+
+// ============================================
 // UTILITY EXPORTS
 // ============================================
 
@@ -315,4 +398,8 @@ export async function getAppointmentByToken(
  * Re-export types for convenience
  */
 export type { Business, Appointment } from './types';
+
+
+
+
 

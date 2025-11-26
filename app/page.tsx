@@ -4,8 +4,8 @@ import { Calendar, CalendarTimeSlots } from '@/components/calendar';
 import { AvailabilityWizard } from '@/components/AvailabilityWizard';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useState, useMemo } from 'react';
-import { format, addMonths, getDay } from 'date-fns';
-import type { TimeSlot } from '@/lib/availability/types';
+import { format, addMonths } from 'date-fns';
+import type { TimeSlot, BusinessAvailability, AvailabilityConfig } from '@/lib/availability/types';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -14,6 +14,7 @@ export default function Home() {
     configured,
     availability,
     config,
+    businessId,
     saveAvailability,
     clearAvailability,
     getDisabledDates,
@@ -22,6 +23,18 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [showWizard, setShowWizard] = useState(false);
+
+  // Customer info form state
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [notes, setNotes] = useState('');
+
+  // Booking state
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingToken, setBookingToken] = useState<string | null>(null);
 
   // Calculate disabled dates for the next 3 months
   const disabledDates = useMemo(() => {
@@ -36,7 +49,7 @@ export default function Home() {
     setSelectedSlot(null); // Reset slot selection when date changes
   };
 
-  const handleWizardComplete = async (newAvailability: any, newConfig: any) => {
+  const handleWizardComplete = async (newAvailability: BusinessAvailability, newConfig?: AvailabilityConfig) => {
     try {
       await saveAvailability(newAvailability, newConfig);
       setShowWizard(false);
@@ -56,6 +69,88 @@ export default function Home() {
       setSelectedDate(undefined);
       setSelectedSlot(null);
     }
+  };
+
+  const handleBookAppointment = async () => {
+    console.log('Book appointment clicked', { selectedSlot, businessId, customerName, customerEmail });
+    
+    if (!selectedSlot) {
+      setBookingError('Please select a time slot');
+      return;
+    }
+    
+    if (!businessId) {
+      setBookingError('Business not found. Please re-configure your availability by clicking "Edit" above, then save it again to enable bookings.');
+      return;
+    }
+
+    // Validate customer info
+    if (!customerName.trim() || !customerEmail.trim()) {
+      setBookingError('Please provide your name and email');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail)) {
+      setBookingError('Please provide a valid email address');
+      return;
+    }
+
+    try {
+      setIsBooking(true);
+      setBookingError(null);
+
+      const durationMinutes = Math.round(
+        (selectedSlot.end.getTime() - selectedSlot.start.getTime()) / 60000
+      );
+
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          business_id: businessId,
+          start_time: selectedSlot.start.toISOString(),
+          end_time: selectedSlot.end.toISOString(),
+          duration_minutes: durationMinutes,
+          customer_email: customerEmail.trim(),
+          customer_name: customerName.trim(),
+          customer_phone: customerPhone.trim() || null,
+          notes: notes.trim() || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to book appointment');
+      }
+
+      // Success!
+      setBookingSuccess(true);
+      setBookingToken(result.data.booking_token);
+
+      // Reset form
+      setCustomerName('');
+      setCustomerEmail('');
+      setCustomerPhone('');
+      setNotes('');
+      setSelectedSlot(null);
+    } catch (error) {
+      console.error('Booking error:', error);
+      setBookingError(
+        error instanceof Error ? error.message : 'Failed to book appointment'
+      );
+    } finally {
+      setIsBooking(false);
+    }
+  };
+
+  const handleCloseSuccess = () => {
+    setBookingSuccess(false);
+    setBookingToken(null);
   };
 
   // Show wizard if not configured or user clicked edit
@@ -100,6 +195,50 @@ export default function Home() {
             Book appointments with {availability?.businessName}
           </p>
         </div>
+
+        {/* Success Modal */}
+        {bookingSuccess && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                  <svg
+                    className="h-6 w-6 text-green-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Appointment Booked!</h3>
+                <p className="text-gray-600 mb-4">
+                  Your appointment has been successfully booked. A confirmation has been sent to your email.
+                </p>
+                {bookingToken && (
+                  <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                    <p className="text-xs text-gray-600 mb-1">Booking Token:</p>
+                    <p className="font-mono text-sm break-all">{bookingToken}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Save this token to manage your appointment
+                    </p>
+                  </div>
+                )}
+                <button
+                  onClick={handleCloseSuccess}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left column: Availability info */}
@@ -165,11 +304,11 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Selected date/time info */}
+            {/* Selected date/time info and booking form */}
             {selectedDate && (
               <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold mb-3">Selection</h3>
-                <div className="space-y-2">
+                <h3 className="text-lg font-semibold mb-3">Book Appointment</h3>
+                <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600">Date</p>
                     <p className="font-medium">
@@ -185,14 +324,88 @@ export default function Home() {
                       </p>
                     </div>
                   )}
+
+                  {selectedSlot && (
+                    <>
+                      <div className="border-t pt-4">
+                        <h4 className="text-sm font-semibold mb-3">Your Information</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label htmlFor="customerName" className="block text-sm text-gray-600 mb-1">
+                              Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              id="customerName"
+                              type="text"
+                              value={customerName}
+                              onChange={(e) => setCustomerName(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="John Doe"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="customerEmail" className="block text-sm text-gray-600 mb-1">
+                              Email <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              id="customerEmail"
+                              type="email"
+                              value={customerEmail}
+                              onChange={(e) => setCustomerEmail(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="john@example.com"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="customerPhone" className="block text-sm text-gray-600 mb-1">
+                              Phone (optional)
+                            </label>
+                            <input
+                              id="customerPhone"
+                              type="tel"
+                              value={customerPhone}
+                              onChange={(e) => setCustomerPhone(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="+1 (555) 123-4567"
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="notes" className="block text-sm text-gray-600 mb-1">
+                              Notes (optional)
+                            </label>
+                            <textarea
+                              id="notes"
+                              value={notes}
+                              onChange={(e) => setNotes(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                              placeholder="Any special requests or information..."
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {bookingError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-600">{bookingError}</p>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={handleBookAppointment}
+                        disabled={isBooking}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {isBooking ? 'Booking...' : 'Book Appointment'}
+                      </button>
+                    </>
+                  )}
                 </div>
-                {selectedSlot && (
-                  <button
-                    className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Book Appointment
-                  </button>
-                )}
               </div>
             )}
           </div>

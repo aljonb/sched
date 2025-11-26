@@ -20,7 +20,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
  * This function creates a Supabase client that automatically includes
  * the Clerk session token in all requests. Use this in client components.
  * 
- * @param getToken - Function that returns the current Clerk session token
+ * @param getToken - Async function that returns the current Clerk session token
  * @returns Authenticated Supabase client
  * 
  * @example
@@ -28,24 +28,23 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
  * 
  * function MyComponent() {
  *   const { session } = useSession();
- *   const supabase = createClerkSupabaseClient(() => session?.getToken());
+ *   const supabase = createClerkSupabaseClient(async () => session?.getToken() ?? null);
  *   
  *   // Use supabase client...
  * }
  */
 export function createClerkSupabaseClient(
-  getToken: () => Promise<string | null> | string | null
+  getToken: () => Promise<string | null>
 ): SupabaseClient {
   return createClient(supabaseUrl, supabaseKey, {
     global: {
-      headers: async () => {
+      async fetch(url, options = {}) {
         const token = await getToken();
-        if (!token) {
-          return {};
+        const headers = new Headers(options.headers);
+        if (token) {
+          headers.set('Authorization', `Bearer ${token}`);
         }
-        return {
-          Authorization: `Bearer ${token}`,
-        };
+        return fetch(url, { ...options, headers });
       },
     },
     auth: {
@@ -96,4 +95,5 @@ export function getAnonSupabaseClient(): SupabaseClient {
     },
   });
 }
+
 

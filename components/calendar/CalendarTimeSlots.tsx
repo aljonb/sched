@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { format, getDay } from 'date-fns';
+import { format } from 'date-fns';
 import type { BusinessAvailability, AvailabilityConfig, TimeSlot } from '@/lib/availability/types';
 import { generateTimeSlots, isDateAvailable } from '@/lib/availability/utils';
 
@@ -165,6 +165,7 @@ export const CalendarTimeSlots = ({
     </div>
   );
 };
+
 
 
 

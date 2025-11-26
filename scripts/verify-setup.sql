@@ -140,3 +140,7 @@ INSERT INTO businesses (
 -- Uncomment to reset and start fresh (DANGER: deletes all data!)
 -- TRUNCATE businesses, appointments, blocked_slots CASCADE;
 
+
+
+
+

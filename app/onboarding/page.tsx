@@ -5,6 +5,7 @@ import { useAvailability } from '@/hooks/useAvailability';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
+import type { BusinessAvailability, AvailabilityConfig } from '@/lib/availability/types';
 
 /**
  * Business Onboarding Page
@@ -39,7 +40,7 @@ export default function OnboardingPage() {
     }
   }, [isUserLoaded, user, router]);
 
-  const handleComplete = async (availability: any, config: any) => {
+  const handleComplete = async (availability: BusinessAvailability, config?: AvailabilityConfig) => {
     setError(null);
     setIsSaving(true);
 
@@ -84,7 +85,7 @@ export default function OnboardingPage() {
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-2">Welcome to Your Scheduling Engine</h1>
           <p className="text-gray-600">
-            Let's set up your business availability in just a few steps
+            Let&apos;s set up your business availability in just a few steps
           </p>
         </div>
 
@@ -101,11 +102,12 @@ export default function OnboardingPage() {
         {/* Help Text */}
         <div className="text-center text-sm text-gray-500 max-w-md">
           <p>
-            Don't worry, you can change these settings anytime from your dashboard.
+            Don&apos;t worry, you can change these settings anytime from your dashboard.
           </p>
         </div>
       </div>
     </div>
   );
 }
+
 

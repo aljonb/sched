@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { BusinessAvailability, AvailabilityConfig, TimeOfDay } from '@/lib/availability/types';
+import type { BusinessAvailability, AvailabilityConfig } from '@/lib/availability/types';
 import { formatTimeOfDay, parseTimeString } from '@/lib/availability/utils';
 
 interface AvailabilityWizardProps {
