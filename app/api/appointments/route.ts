@@ -6,7 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAppointment, getBookedSlotsForBusiness } from '@/lib/booking/db';
-import { CreateAppointmentInput } from '@/lib/booking/types';
+import { CreateAppointmentInput, AppointmentStatus } from '@/lib/booking/types';
+import { safeValidateCreateAppointment } from '@/lib/booking/validation';
 
 /**
  * GET /api/appointments
@@ -60,7 +61,13 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/appointments
  * 
- * Creates a new appointment
+ * Creates a new appointment with validation and conflict prevention
+ * 
+ * Features:
+ * - Comprehensive Zod validation (business rules, data types)
+ * - Race condition protection via database triggers
+ * - Graceful conflict handling with specific error messages
+ * - Support for unauthenticated bookings (customer_id nullable)
  * 
  * Request body: CreateAppointmentInput
  * Response: { success: true, data: Appointment } | { success: false, error: string }
@@ -69,52 +76,74 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate required fields
-    const requiredFields = [
-      'business_id',
-      'start_time',
-      'end_time',
-      'duration_minutes',
-      'customer_email',
-      'customer_name',
-    ];
-
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: `Missing required field: ${field}` 
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Create the appointment
-    const input: CreateAppointmentInput = {
-      business_id: body.business_id,
-      customer_id: body.customer_id || null,
-      start_time: body.start_time,
-      end_time: body.end_time,
-      duration_minutes: body.duration_minutes,
-      customer_email: body.customer_email,
-      customer_name: body.customer_name,
-      customer_phone: body.customer_phone || null,
-      notes: body.notes || null,
-    };
-
-    const result = await createAppointment(input);
-
-    if (!result.success) {
+    // Step 1: Validate request body using Zod schema
+    const validation = safeValidateCreateAppointment(body);
+    
+    if (!validation.success) {
+      // Return validation errors with details
+      const errorMessage = validation.error.errors
+        .map(err => `${err.path.join('.')}: ${err.message}`)
+        .join('; ');
+      
       return NextResponse.json(
-        { success: false, error: result.error },
+        { 
+          success: false, 
+          error: `Validation failed: ${errorMessage}`,
+          details: validation.error.errors
+        },
         { status: 400 }
       );
     }
 
+    // Step 2: Create appointment with 'confirmed' status
+    // The database trigger will automatically:
+    // - Check for race conditions (overlapping appointments)
+    // - Verify slot is not blocked
+    // - Generate booking token
+    const input: CreateAppointmentInput = {
+      ...validation.data,
+      status: AppointmentStatus.CONFIRMED, // Set to confirmed per requirements
+    };
+
+    const result = await createAppointment(input);
+
+    // Step 3: Handle conflicts gracefully
+    if (!result.success) {
+      // Check if this is a conflict error from the database trigger
+      const isConflictError = 
+        result.error.includes('conflict') || 
+        result.error.includes('overlaps') ||
+        result.error.includes('blocked');
+      
+      if (isConflictError) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'This time slot is no longer available. Please choose another time.',
+            type: 'SLOT_UNAVAILABLE'
+          },
+          { status: 409 } // 409 Conflict
+        );
+      }
+
+      // Other database errors
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: result.error,
+          type: 'DATABASE_ERROR'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Step 4: Return created appointment with booking token
     return NextResponse.json(
-      { success: true, data: result.data },
+      { 
+        success: true, 
+        data: result.data,
+        message: 'Appointment successfully booked!'
+      },
       { status: 201 }
     );
   } catch (error) {
@@ -122,7 +151,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Internal server error' 
+        error: error instanceof Error ? error.message : 'Internal server error',
+        type: 'INTERNAL_ERROR'
       },
       { status: 500 }
     );
