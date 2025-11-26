@@ -417,3 +417,4 @@ All that remains is the manual Clerk + Supabase dashboard configuration (5 minut
 
 
 
+

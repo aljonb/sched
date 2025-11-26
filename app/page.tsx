@@ -1,11 +1,10 @@
 'use client';
 
 import { Calendar, CalendarTimeSlots } from '@/components/calendar';
-import { AvailabilityWizard } from '@/components/AvailabilityWizard';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useState, useMemo } from 'react';
 import { format, addMonths } from 'date-fns';
-import type { TimeSlot, BusinessAvailability, AvailabilityConfig } from '@/lib/availability/types';
+import type { TimeSlot } from '@/lib/availability/types';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -13,16 +12,15 @@ export default function Home() {
   const {
     configured,
     availability,
-    config,
     businessId,
-    saveAvailability,
     clearAvailability,
     getDisabledDates,
+    isLoading,
+    error,
   } = useAvailability();
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
-  const [showWizard, setShowWizard] = useState(false);
 
   // Customer info form state
   const [customerName, setCustomerName] = useState('');
@@ -47,20 +45,6 @@ export default function Home() {
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
     setSelectedSlot(null); // Reset slot selection when date changes
-  };
-
-  const handleWizardComplete = async (newAvailability: BusinessAvailability, newConfig?: AvailabilityConfig) => {
-    try {
-      await saveAvailability(newAvailability, newConfig);
-      setShowWizard(false);
-    } catch (error) {
-      console.error('Failed to save availability:', error);
-      alert('Failed to save availability. Please try again.');
-    }
-  };
-
-  const handleEditAvailability = () => {
-    setShowWizard(true);
   };
 
   const handleClearAvailability = () => {
@@ -132,12 +116,21 @@ export default function Home() {
       setBookingSuccess(true);
       setBookingToken(result.data.booking_token);
 
-      // Reset form
+      // Reset form and selected slot to trigger refresh of available slots
       setCustomerName('');
       setCustomerEmail('');
       setCustomerPhone('');
       setNotes('');
+      
+      // Clear selected slot and trigger a date re-selection to refresh slots
+      const currentDate = selectedDate;
+      setSelectedDate(undefined);
       setSelectedSlot(null);
+      
+      // Re-select the date to trigger slot refresh in CalendarTimeSlots
+      setTimeout(() => {
+        setSelectedDate(currentDate);
+      }, 0);
     } catch (error) {
       console.error('Booking error:', error);
       setBookingError(
@@ -153,31 +146,31 @@ export default function Home() {
     setBookingToken(null);
   };
 
-  // Show wizard if not configured or user clicked edit
-  if (!configured || showWizard) {
+  // Show "Create Business" prompt if not configured
+  if (!configured) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 p-8">
-        <div className="flex flex-col gap-8 items-center">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold mb-2">Scheduling Engine</h1>
-            <p className="text-gray-600">
-              {configured ? 'Edit your availability' : 'Set up your availability'}
-            </p>
-          </div>
-
-          <AvailabilityWizard
-            onComplete={handleWizardComplete}
-            initialAvailability={availability ?? undefined}
-            initialConfig={config ?? undefined}
-          />
-
-          {configured && (
-            <button
-              onClick={() => setShowWizard(false)}
-              className="text-sm text-gray-600 hover:text-gray-800"
+        <div className="max-w-md text-center">
+          <h1 className="text-3xl font-bold mb-4">Scheduling Engine</h1>
+          <p className="text-gray-600 mb-8">
+            {isLoading 
+              ? 'Loading your business...' 
+              : 'Welcome! To start accepting appointments, you need to set up your business first.'}
+          </p>
+          
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+          
+          {!isLoading && (
+            <a
+              href="/onboarding"
+              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Cancel
-            </button>
+              Create Business
+            </a>
           )}
         </div>
       </div>
@@ -244,15 +237,7 @@ export default function Home() {
           {/* Left column: Availability info */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Availability</h2>
-                <button
-                  onClick={handleEditAvailability}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                >
-                  Edit
-                </button>
-              </div>
+              <h2 className="text-lg font-semibold mb-4">Availability</h2>
 
               <div className="space-y-4">
                 <div>
@@ -420,11 +405,10 @@ export default function Home() {
                 disabledDates={disabledDates}
               />
 
-              {availability && (
+              {businessId && (
                 <CalendarTimeSlots
                   selectedDate={selectedDate ?? null}
-                  availability={availability}
-                  config={config ?? undefined}
+                  businessId={businessId}
                   onSelectSlot={setSelectedSlot}
                   selectedSlot={selectedSlot}
                 />

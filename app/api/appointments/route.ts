@@ -1,12 +1,61 @@
 /**
  * Appointments API Route
  * 
- * Handles appointment creation (booking)
+ * Handles appointment creation (booking) and fetching booked slots
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createAppointment } from '@/lib/booking/db';
+import { createAppointment, getBookedSlotsForBusiness } from '@/lib/booking/db';
 import { CreateAppointmentInput } from '@/lib/booking/types';
+
+/**
+ * GET /api/appointments
+ * 
+ * Fetches booked time slots for a business within a date range (public access)
+ * Query params: business_id, start_date, end_date
+ * Response: { success: true, data: Array<{ start_time, end_time }> } | { success: false, error: string }
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const businessId = searchParams.get('business_id');
+    const startDate = searchParams.get('start_date');
+    const endDate = searchParams.get('end_date');
+
+    if (!businessId || !startDate || !endDate) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Missing required parameters: business_id, start_date, end_date' 
+        },
+        { status: 400 }
+      );
+    }
+
+    const result = await getBookedSlotsForBusiness(businessId, startDate, endDate);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, data: result.data },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('Error fetching booked slots:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Internal server error' 
+      },
+      { status: 500 }
+    );
+  }
+}
 
 /**
  * POST /api/appointments
@@ -79,4 +128,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 

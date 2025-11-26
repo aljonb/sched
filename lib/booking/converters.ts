@@ -157,6 +157,8 @@ export function businessAvailabilityToDb(
     available_hours: availableHours,
     break_times: breakTimes,
     slot_duration_minutes: config.slotDuration ?? 60,
+    min_advance_booking_minutes: config.minAdvanceBooking ?? 0,
+    max_advance_booking_days: config.maxAdvanceBooking ?? 90,
     is_active: true,
   };
 }
@@ -223,6 +225,8 @@ export function dbToAvailabilityConfig(business: Business): AvailabilityConfig {
   return {
     slotDuration: business.slot_duration_minutes,
     timezone: business.timezone,
+    minAdvanceBooking: business.min_advance_booking_minutes,
+    maxAdvanceBooking: business.max_advance_booking_days,
   };
 }
 
@@ -243,6 +247,7 @@ export function isValidDayName(dayName: string): boolean {
 export function isValidDayNumber(dayNumber: number): boolean {
   return dayNumber in DAY_NUMBER_TO_NAME;
 }
+
 
 
 

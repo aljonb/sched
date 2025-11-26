@@ -390,6 +390,124 @@ export async function createAppointment(
   }
 }
 
+/**
+ * Fetches booked time slots for a business within a date range
+ * Returns only start_time and end_time (no customer info)
+ * 
+ * @param businessId - Business UUID
+ * @param startDate - Start of date range
+ * @param endDate - End of date range
+ * @returns Array of time ranges that are booked
+ * 
+ * @security Public access - only returns time slots, not appointment details
+ * 
+ * @example
+ * ```ts
+ * const result = await getBookedSlotsForBusiness(
+ *   businessId,
+ *   new Date('2025-11-25T00:00:00Z'),
+ *   new Date('2025-11-25T23:59:59Z')
+ * );
+ * if (result.success) {
+ *   console.log(`Found ${result.data.length} booked slots`);
+ * }
+ * ```
+ */
+export async function getBookedSlotsForBusiness(
+  businessId: string,
+  startDate: Date | string,
+  endDate: Date | string
+): Promise<DbResult<Array<{ start_time: string; end_time: string }>>> {
+  try {
+    const supabase = await createClient(cookies());
+    
+    // Convert to ISO strings if Date objects
+    const startDateStr = startDate instanceof Date ? startDate.toISOString() : startDate;
+    const endDateStr = endDate instanceof Date ? endDate.toISOString() : endDate;
+
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('start_time, end_time')
+      .eq('business_id', businessId)
+      .in('status', ['pending', 'confirmed']) // Only active appointments
+      .gte('start_time', startDateStr)
+      .lte('start_time', endDateStr)
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      return { 
+        success: false, 
+        error: `Failed to fetch booked slots: ${error.message}` 
+      };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (err) {
+    return { 
+      success: false, 
+      error: `Unexpected error fetching booked slots: ${err instanceof Error ? err.message : 'Unknown error'}` 
+    };
+  }
+}
+
+/**
+ * Fetches blocked slots for a business within a date range
+ * 
+ * @param businessId - Business UUID
+ * @param startDate - Start of date range
+ * @param endDate - End of date range
+ * @returns Array of blocked time periods
+ * 
+ * @security Respects RLS: Only returns blocked slots if the user is the business owner
+ * 
+ * @example
+ * ```ts
+ * const result = await getBlockedSlotsForBusiness(
+ *   businessId,
+ *   new Date('2025-11-25T00:00:00Z'),
+ *   new Date('2025-11-30T23:59:59Z')
+ * );
+ * if (result.success) {
+ *   console.log(`Found ${result.data.length} blocked slots`);
+ * }
+ * ```
+ */
+export async function getBlockedSlotsForBusiness(
+  businessId: string,
+  startDate: Date | string,
+  endDate: Date | string
+): Promise<DbResult<import('./types').BlockedSlot[]>> {
+  try {
+    const supabase = await createClient(cookies());
+    
+    // Convert to ISO strings if Date objects
+    const startDateStr = startDate instanceof Date ? startDate.toISOString() : startDate;
+    const endDateStr = endDate instanceof Date ? endDate.toISOString() : endDate;
+
+    const { data, error } = await supabase
+      .from('blocked_slots')
+      .select('*')
+      .eq('business_id', businessId)
+      .gte('start_time', startDateStr)
+      .lte('start_time', endDateStr)
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      return { 
+        success: false, 
+        error: `Failed to fetch blocked slots: ${error.message}` 
+      };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (err) {
+    return { 
+      success: false, 
+      error: `Unexpected error fetching blocked slots: ${err instanceof Error ? err.message : 'Unknown error'}` 
+    };
+  }
+}
+
 // ============================================
 // UTILITY EXPORTS
 // ============================================
@@ -397,7 +515,7 @@ export async function createAppointment(
 /**
  * Re-export types for convenience
  */
-export type { Business, Appointment } from './types';
+export type { Business, Appointment, BlockedSlot } from './types';
 
 
 

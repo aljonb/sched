@@ -42,6 +42,8 @@ export interface Business {
     end: string;   // HH:mm format
   }>;
   slot_duration_minutes: number;
+  min_advance_booking_minutes: number; // Minimum minutes in advance required to book (0-43200)
+  max_advance_booking_days: number;    // Maximum days in advance allowed to book (1-365)
   is_active: boolean;
   created_at: string; // ISO timestamp
   updated_at: string; // ISO timestamp
@@ -163,6 +165,7 @@ export function isAppointmentStatus(value: string): value is AppointmentStatus {
 export function appointmentStatusToString(status: AppointmentStatus): string {
   return status as string;
 }
+
 
 
 

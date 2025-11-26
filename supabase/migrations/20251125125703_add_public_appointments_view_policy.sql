@@ -18,3 +18,4 @@ COMMENT ON POLICY "Public can view confirmed and pending appointments" ON public
 
 
 
+
